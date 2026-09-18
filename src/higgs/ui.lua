@@ -1817,7 +1817,6 @@ local function add_voice_dialog()
   end
   if created then
     Config.add_voice(app.cfg, created.id, created.name)
-    Config.unhide_voice(app.cfg, created.id)   -- made again after a Delete
     Config.save(app.cfg)
     reload_voice_combos()
     quick_note(("Created “%s”. It's in your voice list."):format(created.name), "ok")
@@ -2213,8 +2212,13 @@ local function build()
             ui:HGroup{ Weight = 1, Spacing = S.gap,
               ui:Label{ ID = "VersionLabel", Text = "", Weight = 0, MinimumSize = { 40, 0 }, StyleSheet = T.label(),
                         Alignment = { AlignLeft = true, AlignVCenter = true } },
+              -- One button: "Check for updates", which becomes "Update now" once
+              -- a newer release is found. What happened reads to its right.
               ui:Button{ ID = "CheckUpdateBtn", Text = "Check for updates", Weight = 0, StyleSheet = T.button("ghost") },
               ui:Button{ ID = "InstallUpdateBtn", Text = "Update now", Weight = 0, StyleSheet = T.button("primary"), Hidden = true },
+              ui:Label{ Weight = 0, MinimumSize = { 4, 0 }, MaximumSize = { 4, 4000 } },   -- a little air after the button
+              ui:Label{ ID = "UpdateStatus", Text = "", Weight = 0, MinimumSize = { 40, 0 }, StyleSheet = T.label("secondary"),
+                        Alignment = { AlignLeft = true, AlignVCenter = true } },
               ui:Button{ ID = "ReleaseNotesBtn", Text = "Release notes", Weight = 0, StyleSheet = T.button("link"), Hidden = true },
               ui:Label{ Weight = 1 } }),
           settings_row("", ui:CheckBox{ ID = "AutoUpdateChk", Text = "Check for updates when Higgs VoiceOver opens", Weight = 1, StyleSheet = T.checkbox() }),
@@ -2311,26 +2315,36 @@ local function is_newer(candidate, current)
   return false
 end
 
+--- The Version row: the version, one button, then what happened.
+local function update_status(text, color)
+  itm.UpdateStatus.Text = (text and text ~= "") and span(color or c.text_2, text) or ""
+end
+
 local function refresh_update_ui()
-  local lbl = itm.VersionLabel
-  local was_hidden = itm.InstallUpdateBtn.Hidden
-  -- The version is a value, so it reads at body size like every other value
-  -- on the page; whatever follows it is a status and takes the quiet colour.
-  lbl.StyleSheet = T.label()
+  local before = { itm.CheckUpdateBtn.Hidden, itm.InstallUpdateBtn.Hidden, itm.ReleaseNotesBtn.Hidden }
+  itm.VersionLabel.StyleSheet = T.label()
+  itm.VersionLabel.Text = esc(VERSION)
+  local found = update.latest ~= nil
+  -- Once a newer release is known, checking again has nothing to add: the
+  -- button becomes the update itself.
+  itm.CheckUpdateBtn.Hidden = found
+  itm.InstallUpdateBtn.Hidden = not (found and update.asset)
+  itm.ReleaseNotesBtn.Hidden = not (found and update.url)
   if update.checking then
-    lbl.Text = esc(VERSION) .. span(c.text_2, "  ·  checking…")
-  elseif update.latest then
-    lbl.Text = esc(VERSION) .. span(c.ok, ("  ·  version %s is available"):format(update.latest))
+    update_status("Checking…")
   elseif update.error then
-    lbl.Text = esc(VERSION) .. span(c.error_text, "  ·  " .. update.error)
+    -- A failed check or download; with a release found, Update now stays
+    -- so it can be tried again.
+    update_status((update.error:gsub("^%l", string.upper)), c.error_text)
+  elseif found then
+    update_status(("Version %s is available"):format(update.latest), c.ok)
   elseif update.checked_at then
-    lbl.Text = esc(VERSION) .. span(c.text_2, "  ·  up to date")
+    update_status("Up to date")
   else
-    lbl.Text = esc(VERSION)
+    update_status("")
   end
-  itm.InstallUpdateBtn.Hidden = not (update.latest and update.asset)
-  itm.ReleaseNotesBtn.Hidden = not (update.latest and update.url)
-  if was_hidden ~= itm.InstallUpdateBtn.Hidden then relayout() end
+  if before[1] ~= itm.CheckUpdateBtn.Hidden or before[2] ~= itm.InstallUpdateBtn.Hidden
+     or before[3] ~= itm.ReleaseNotesBtn.Hidden then relayout() end
 end
 
 local function check_for_updates(quiet)
@@ -2364,6 +2378,8 @@ local function check_for_updates(quiet)
       update.latest = is_newer(latest, VERSION) and latest or nil
       Log.info(("update check: latest %s, running %s%s"):format(latest, VERSION, update.latest and " → update available" or ""))
       refresh_update_ui()
+      -- Announced once in the Generate tab's status line — never a
+      -- system notification or a pop-up.
       if update.latest then
         status(("Higgs VoiceOver %s is available — update from Settings."):format(update.latest), "ok")
       end
@@ -2375,8 +2391,8 @@ local function install_update()
   if not update.asset then return end
   local dest = P.join(P.scripts_dir(), Config.SCRIPT_FILE)
   local tmp = P.join(Config.tmp_dir(), "Higgs VO.update.lua")
-  itm.VersionLabel.StyleSheet = T.label()
-  itm.VersionLabel.Text = esc(VERSION) .. span(c.text_2, ("  ·  downloading %s…"):format(update.latest))
+  update.error = nil
+  update_status(("Downloading %s…"):format(update.latest))
   Log.info("update: downloading " .. tostring(update.asset))
   app.api:fetch({
     url = update.asset, out_path = tmp, label = "update download",
@@ -2407,8 +2423,7 @@ local function install_update()
         if p ~= dest and P.exists(p) then os.remove(p); Log.info("update: removed old menu entry " .. old) end
       end
       Log.info("update: installed", { version = update.latest, to = Log.path_safe(dest) })
-      itm.VersionLabel.StyleSheet = T.label("ok")
-      itm.VersionLabel.Text = ("%s installed — close and reopen Higgs VoiceOver"):format(update.latest)
+      update_status(("%s installed — close and reopen Higgs VoiceOver"):format(update.latest), c.ok)
       itm.InstallUpdateBtn.Hidden = true
       relayout()
       status(("Higgs VoiceOver %s is installed. Restart Resolve, then open Higgs VoiceOver from Workspace › Scripts."):format(update.latest), "ok")
@@ -2460,30 +2475,6 @@ local function key_error(res, context)
   return res.error or "Couldn't connect to Boson."
 end
 
---- The voices already on this key's account, so someone connecting on a new
--- machine finds the voices they made elsewhere. Deleted ones stay deleted.
-local function sync_voices()
-  app.api:list_voices({ on_done = function(res)
-    if not res.ok or type(res.data) ~= "table" then
-      Log.warn("voice sync failed", { error = tostring(res.error) })
-      return
-    end
-    local list = res.data.data or res.data.voices or res.data
-    local added = 0
-    for _, v in ipairs(type(list) == "table" and list or {}) do
-      local vid = v.voice or v.id or v.voice_id
-      if vid and not Config.is_hidden_voice(app.cfg, vid) then
-        local known = Config.find_voice(app.cfg, vid)
-        if not known then added = added + 1 end
-        Config.add_voice(app.cfg, vid, Api.voice_label(v, known and known.name))
-      end
-    end
-    Config.save(app.cfg)
-    reload_voice_combos()
-    Log.metric("voice.sync", { added = added })
-  end })
-end
-
 local function test_key(key, status_label, on_ok, context)
   if key == "" then
     status_label.StyleSheet = T.label("error")
@@ -2504,7 +2495,6 @@ local function test_key(key, status_label, on_ok, context)
       status_label.StyleSheet = T.label("ok")
       status_label.Text = "●  " .. msg
       if on_ok then on_ok() end
-      sync_voices()
       -- Only a working key moves the user on; the message follows them to
       -- the Generate page, which replaces the setup page they were on.
       route()
@@ -2679,7 +2669,11 @@ local function wire_generate()
     -- Qt delivers this from the queue, so a programmatic write arrives here
     -- after the guard has lifted. Nothing changed, so leave any status
     -- message ("Imported…", "2/2 generated") standing.
-    if itm.QuickText.PlainText == quick.text then return end
+    -- An empty box reports a lone line break once it has been painted;
+    -- trailing line breaks are layout, not an edit (they were wiping the
+    -- startup status line and saving a one-character draft).
+    local function body(t) return (tostring(t or ""):gsub("[\r\n]+$", "")) end
+    if body(itm.QuickText.PlainText) == body(quick.text) then return end
     quick.text = itm.QuickText.PlainText
     quick.dirty_at = now()
     quick_refresh()
@@ -2771,8 +2765,6 @@ local function wire_generate()
     local e = selected_quick_voice()
     if not e or not Config.find_voice(app.cfg, e.value) then return end
     Config.remove_voice(app.cfg, e.value)
-    -- Remembered, so fetching the account's voices does not bring it back.
-    Config.hide_voice(app.cfg, e.value)
     -- A deleted voice cannot stay the one in use.
     if quick.voice == e.value then quick.voice = nil; quick.dirty_at = now() end
     if app.cfg.default_voice == e.value then app.cfg.default_voice = Config.DEFAULTS.default_voice end
@@ -3065,6 +3057,13 @@ function M.run(context)
   if app.initial_status then status(app.initial_status, app.initial_status_kind) end
   if app.warning then status(app.warning, "error") end
 
+  -- Screenshot harness: a newer release has been found.
+  if app.demo_update then
+    update.latest, update.url, update.asset = app.demo_update, "https://github.com/" .. UPDATE_REPO .. "/releases", "x"
+    update.checked_at = os.time()
+    refresh_update_ui()
+    status(("Higgs VoiceOver %s is available — update from Settings."):format(update.latest), "ok")
+  end
   if app.before_show then app.before_show(itm, win) end   -- harness hook
   win:Show()
   shown = true

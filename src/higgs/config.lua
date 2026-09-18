@@ -46,7 +46,6 @@ local DEFAULTS = {
   analytics     = true,        -- asked on first run (checked); nothing is sent yet
   last_update_check = 0,
   voices        = {},          -- cloned voice library: { {id=, name=, created=} }
-  hidden_voices = {},          -- ids deleted from the list; fetching the account skips them
   recent_files  = {},
 }
 
@@ -234,25 +233,6 @@ function M.remove_voice(cfg, id)
   for i, v in ipairs(cfg.voices) do
     if v.id == id then table.remove(cfg.voices, i) return true end
   end
-  return false
-end
-
---- Delete removes a voice from the list only (Boson has no delete yet), so
--- the id is remembered and fetching the account's voices leaves it out.
-function M.hide_voice(cfg, id)
-  cfg.hidden_voices = cfg.hidden_voices or {}
-  for _, h in ipairs(cfg.hidden_voices) do if h == id then return end end
-  cfg.hidden_voices[#cfg.hidden_voices + 1] = id
-end
-
-function M.unhide_voice(cfg, id)
-  for i, h in ipairs(cfg.hidden_voices or {}) do
-    if h == id then table.remove(cfg.hidden_voices, i) return end
-  end
-end
-
-function M.is_hidden_voice(cfg, id)
-  for _, h in ipairs(cfg.hidden_voices or {}) do if h == id then return true end end
   return false
 end
 

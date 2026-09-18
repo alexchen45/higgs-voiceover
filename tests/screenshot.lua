@@ -5,7 +5,7 @@
 -- Scenarios:
 --   onboarding   setup · setup-error · setup-skipped · connect
 --   generate     quick · quickrun · quickdone · quicklate · quicktag · quickerror · quickstopped · palette
---   settings     settings
+--   settings     settings · update · update-generate (a newer release found)
 --   add a voice  addvoice · addvoice-recording · addvoice-take · addvoice-short · addvoice-own ·
 --                addvoice-file · addvoice-norecord (and the variants handled below)
 --
@@ -195,6 +195,11 @@ elseif scenario:sub(1, 8) == "addvoice" then
   end
 elseif scenario == "settings" then
   ctx.initial_tab = 1
+elseif scenario == "update" then
+  ctx.initial_tab = 1
+  ctx.demo_update = "0.2.0"
+elseif scenario == "update-generate" then
+  ctx.demo_update = "0.2.0"
 end
 
 if os.getenv("HIGGS_SHOT_PROBE") then
