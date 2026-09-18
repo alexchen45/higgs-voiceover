@@ -52,15 +52,16 @@ Boson account. Get a key from your
 
 ## Install
 
-1. Download `Higgs VoiceOver <version>.pkg` from the
+1. Download `Higgs-VoiceOver-<version>.pkg` from the
    [latest release](../../releases/latest).
 2. Open it and follow the installer. It asks for your password because it
    installs for every user on the Mac.
 3. Quit and reopen DaVinci Resolve, open a project, and choose
    **Workspace → Scripts → Higgs VoiceOver**.
 
-**By hand instead:** download `Higgs VoiceOver.lua` from the
-[latest release](../../releases/latest), copy it into
+**By hand instead:** download `Higgs-VoiceOver.lua` from the
+[latest release](../../releases/latest), rename it to **`Higgs VoiceOver.lua`**
+(Resolve shows the file name as the menu entry), copy it into
 `~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion/Scripts/Utility/`,
 and restart Resolve.
 

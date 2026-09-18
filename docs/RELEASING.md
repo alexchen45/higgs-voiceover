@@ -18,8 +18,12 @@ built script are ignored):
 
 | Asset | For | Notes |
 |---|---|---|
-| `Higgs VoiceOver.lua` | The in-app updater and manual installs | The updater looks for this exact file name |
-| `Higgs VoiceOver X.Y.Z.pkg` | Mac users | Signed and notarized, or Gatekeeper blocks it |
+| `Higgs-VoiceOver.lua` | The in-app updater and manual installs | GitHub does not allow spaces in asset names; upload it under this name. The updater matches it by letters only and installs it as `Higgs VoiceOver.lua` |
+| `Higgs-VoiceOver-X.Y.Z.pkg` | Mac users | Signed and notarized, or Gatekeeper blocks it |
+
+The build writes `dist/Higgs VoiceOver.lua` and `dist/Higgs VoiceOver X.Y.Z.pkg`;
+copy them to the hyphenated names before uploading, so the download names are
+the ones the README gives.
 
 GitHub's automatic "Source code" archives are added by GitHub.
 
@@ -93,6 +97,6 @@ Build notes:
 The app reads `https://api.github.com/repos/<UPDATE_REPO>/releases/latest`
 (`UPDATE_REPO` is set near the top of the updates section in `src/higgs/ui.lua`),
 compares the tag with its own version, and offers **Update now**, which
-downloads `Higgs VoiceOver.lua`, checks that it compiles, and replaces the
+downloads the `.lua` asset, checks that it compiles, and replaces the
 installed script. Pre-releases are not returned by that endpoint, so mark a
 beta as a normal release when you want existing users to be offered it.

@@ -2369,10 +2369,19 @@ local function check_for_updates(quiet)
       local latest = tostring(res.data.tag_name or res.data.name or ""):gsub("^[vV]", "")
       update.url = res.data.html_url
       update.asset = nil
+      -- GitHub will not keep a space in an asset's name ("Higgs VoiceOver.lua"
+      -- is stored as "Higgs.VoiceOver.lua"), so names are compared by their
+      -- letters and digits only. The file is always installed under its real
+      -- name, whatever the asset is called.
+      local function key(name) return (tostring(name or ""):lower():gsub("[^%w]", "")) end
       for _, a in ipairs(res.data.assets or {}) do
-        if a.name == Config.SCRIPT_FILE then update.asset = a.browser_download_url end
-        for _, old in ipairs(Config.LEGACY_SCRIPT_FILES) do
-          if a.name == old and not update.asset then update.asset = a.browser_download_url end
+        if key(a.name) == key(Config.SCRIPT_FILE) then update.asset = a.browser_download_url end
+      end
+      if not update.asset then
+        for _, a in ipairs(res.data.assets or {}) do
+          for _, old in ipairs(Config.LEGACY_SCRIPT_FILES) do
+            if key(a.name) == key(old) then update.asset = a.browser_download_url end
+          end
         end
       end
       update.latest = is_newer(latest, VERSION) and latest or nil
